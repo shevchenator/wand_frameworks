@@ -926,20 +926,29 @@ class UsbSettingsManager {
       Intent intent = new Intent();
 
         // respond immediately if permission has already been granted
-      if (hasPermission(device)) {
-            intent.putExtra(UsbManager.EXTRA_DEVICE, device);
-            intent.putExtra(UsbManager.EXTRA_PERMISSION_GRANTED, true);
+        if (!hasPermission(device)) {
+            final int uid = Binder.getCallingUid();
+
+            // compare uid with packageName to foil apps pretending to be someone else
             try {
-                pi.send(mUserContext, 0, intent);
-            } catch (PendingIntent.CanceledException e) {
-                if (DEBUG) Slog.d(TAG, "requestPermission PendingIntent was cancelled");
+                ApplicationInfo aInfo = mPackageManager.getApplicationInfo(packageName, 0);
+                if (aInfo.uid != uid) {
+                    throw new IllegalArgumentException("package " + packageName +
+                            " does not match caller's uid " + uid);
+                }
+            } catch (PackageManager.NameNotFoundException e) {
+                throw new IllegalArgumentException("package " + packageName + " not found");
             }
-            return;
+            grantDevicePermission(device, uid);
         }
 
-        // start UsbPermissionActivity so user can choose an activity
         intent.putExtra(UsbManager.EXTRA_DEVICE, device);
-        requestPermissionDialog(intent, packageName, pi);
+        intent.putExtra(UsbManager.EXTRA_PERMISSION_GRANTED, true);
+        try {
+            pi.send(mUserContext, 0, intent);
+        } catch (PendingIntent.CanceledException e) {
+            if (DEBUG) Slog.d(TAG, "requestPermission PendingIntent was cancelled");
+        }
     }
 
     public void requestPermission(UsbAccessory accessory, String packageName, PendingIntent pi) {
@@ -947,18 +956,28 @@ class UsbSettingsManager {
 
         // respond immediately if permission has already been granted
         if (hasPermission(accessory)) {
-            intent.putExtra(UsbManager.EXTRA_ACCESSORY, accessory);
-            intent.putExtra(UsbManager.EXTRA_PERMISSION_GRANTED, true);
+            final int uid = Binder.getCallingUid();
+
+            // compare uid with packageName to foil apps pretending to be someone else
             try {
-                pi.send(mUserContext, 0, intent);
-            } catch (PendingIntent.CanceledException e) {
-                if (DEBUG) Slog.d(TAG, "requestPermission PendingIntent was cancelled");
+                ApplicationInfo aInfo = mPackageManager.getApplicationInfo(packageName, 0);
+                if (aInfo.uid != uid) {
+                    throw new IllegalArgumentException("package " + packageName +
+                            " does not match caller's uid " + uid);
+                }
+            } catch (PackageManager.NameNotFoundException e) {
+                throw new IllegalArgumentException("package " + packageName + " not found");
             }
-            return;
+            grantAccessoryPermission(accessory, uid);
         }
 
         intent.putExtra(UsbManager.EXTRA_ACCESSORY, accessory);
-        requestPermissionDialog(intent, packageName, pi);
+        intent.putExtra(UsbManager.EXTRA_PERMISSION_GRANTED, true);
+        try {
+            pi.send(mUserContext, 0, intent);
+        } catch (PendingIntent.CanceledException e) {
+            if (DEBUG) Slog.d(TAG, "requestPermission PendingIntent was cancelled");
+        }
     }
 
     public void setDevicePackage(UsbDevice device, String packageName) {
